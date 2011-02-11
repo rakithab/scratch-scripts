@@ -1,0 +1,15 @@
+I removed the public key in the ISOTDAQ and add it under account settings that way this will be accessible to all repos not only ISOTDAQ
+
+  543  cd scratch/scripts/
+  550  git init
+  551  git add qtor_scan.C
+  552  git commit -m 'first commit'
+  553  git remote add origin git@github.com:rakithab/scratch-scripts.git
+  554  git push origin master
+  555  ls
+  556  git add PlotTools.C beambcm.cc PlotGraph.C
+  557  git commit -m 'root plot tools'
+  558  git remote add origin git@github.com:rakithab/scratch-scripts.git
+  559  git push origin master
+  560  touch README
+  561  history > README 
