@@ -2,6 +2,36 @@
 Author Rakitha Beminiwattha
 contact rakithab@jlab.org
 PlotTools is a set collection of routines that enables to plot multiple graphs reading a text file
+v 0.0.0 Thu 17:57:56 2011 :
+                       Read a text file which should have tab separated columns of X (X-Error) and Y(Y-Errors) values.
+                       Plots on a multigraph with or without errors. For multigraphs only common X axis 
+                       can be used. 
+                       At the end of the data There must be following lines,
+                          1. After data next must have 'END'
+                          2. canvas name
+                          3. canvas title
+                          4. Legend title
+                          5. names of Y axis parameter (line for each Y value)
+                          6. Multi Graph Title
+                          7. X axis name + unit
+                          8. Y axis name + unit
+
+		       IF no X or Y errors set the parameters hasXErrors and  hasYErrors to false and use the
+		       routine Plot()
+
+		       If X or/and Y has error set above parameters apropriately and use the routine,
+		       PlotwithError()
+
+		       Set parameter ny to no. of Y parameters
+		       Set parameter n to no of data points
+
+		       Then use,
+		       root -l
+		       .L PlotTools.C
+		       Plot() or
+		       PlotwithErrors()
+		       
+
  */
 
 #include <vector>
