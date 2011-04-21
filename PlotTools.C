@@ -1,9 +1,9 @@
 /*
-Author : Rakitha Beminiwattha
-Contact: rakithab@jlab.org
-Date   : 02-04-2011
-Desc   : This script provides support routines to plot set of data point and error in a text file.
+Author Rakitha Beminiwattha
+contact rakithab@jlab.org
+PlotTools is a set collection of routines that enables to plot multiple graphs reading a text file
  */
+
 #include <vector>
 #include "TRandom.h"
 
@@ -27,13 +27,26 @@ Desc   : This script provides support routines to plot set of data point and err
 #include <TMath.h>
 
 #include <cstdlib>
+
+
+#define CANVAS_SPLIT_Col 2
+#define CANVAS_SPLIT_Raw 2
+
+
 Int_t Read_Data_file(TString data_file);
 string GetNextToken(const string& line);
 string GetNextToken(const string& line, const char& delim);
-const Int_t n = 3;
-const Int_t ny = 1;
+void PlotwithErrors();
+const Int_t n = 4;//
+const Int_t ny =1;
 Double_t X[n], Y[ny][n];
+//vector<Double_t> X;
+//vector<<vector<Double_t>Double_t> Y;
+//X.resize(n);
+//Y.resize(ny);
 Double_t eX[n], eY[ny][n];
+Bool_t hasXErrors = kFALSE;//kTRUE;
+Bool_t hasYErrors = kTRUE;//kFALSE;//kTRUE;
 
 //These will be read from the data file
 
@@ -45,7 +58,10 @@ TString multigraphtitle;
 TString xTitle;
 TString yTitle;
 
-gStyle->SetOptFit(1);
+TString multicanvas_name="Multi_C";
+TString multicanvas_title="Multiple Plots";
+
+
 //Use this routine to check the data file
 Int_t Read_Data_file(TString data_file)
 {
@@ -289,10 +305,19 @@ void FillDataArrays(Int_t x,vector<Double_t> &raw_data){
   Int_t count_col=1;
   Int_t count=0;
   X[x]=raw_data.at(0);//x value
+  if (hasXErrors){
+    eX[x]=raw_data.at(1);//x value
+    count_col++;
+  }else
+    eX[x]=0;
+
   while(count<ny){
      Y[count][x]=raw_data.at(count_col);//y1 value
-     eY[count][x]=raw_data.at(count_col+1);//y1 error value
-     count_col+=2;
+     if (hasYErrors){
+       eY[count][x]=raw_data.at(count_col+1);//y1 error value
+       count_col+=2;
+     }else
+       count_col++;
      count++;
   }
 
@@ -305,11 +330,17 @@ void Plot() {
   //DecodeDataFile("./data_file_6393_MD6.in");
   //DecodeDataFile("./data_file_6394.in");
   //DecodeDataFile("./data_file_6394_MD7.in");
-  //DecodeDataFile("/home/rakitha/Qweak_Analysis/data_set_large_Aq");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Beam_Trip_Analysis/Data_Beam_Trips_Stability_Cuts_R7143_SD_1");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Run_Summary/MD_ALL_Asym_Width_IHWP_IN");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Run_Summary/MD_ALL_Asym_Width_IHWP_OUT");
+
+
+  //MD bar corrections terms
+  DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/qtor_scans/LH2_Scans/LH2_MD_Trig_qtor_scan_MD5_Corrections");
 
   TCanvas *c1 = new TCanvas(Form("C_%s",MultiGraphName.Data()),Form("Canvas-%s",CanvasName.Data()),200,10,700,500);
   c1->cd();
-  c1->SetFillColor(42);
+  //c1->SetFillColor(42);
   c1->SetGrid();
 
   TGraph * gr[ny];
@@ -317,13 +348,14 @@ void Plot() {
   TMultiGraph *mg = new TMultiGraph(MultiGraphName,multigraphtitle);
 
   leg->SetHeader(LegHeader);
-  leg->SetFillColor(kWhite);
+  leg->SetFillColor(41);
   for (Int_t i=0;i<ny;i++){
     gr[i] = new TGraph(n,X,Y[i]);
     //gr[i]->SetLineColor(1+i);
     gr[i]->SetLineWidth(4);
     gr[i]->SetMarkerColor(1+i);
-    gr[i]->SetMarkerStyle(21);
+    //gr[i]->SetMarkerStyle(21);
+    gr[i]->SetMarkerStyle(i%3+2);
     gr[i]->SetTitle(GTitles[i]);
     leg->AddEntry(gr[i],gr[i]->GetTitle(), "p");
     mg->Add(gr[i],"P");
@@ -338,7 +370,7 @@ void Plot() {
   leg->Draw();
 
   c1->Update();
-  c1->GetFrame()->SetFillColor(21);
+  //c1->GetPad()->SetFillColor(21);
   //c1->GetFrame()->SetBorderSize(12);
   c1->Modified();
 
@@ -351,20 +383,75 @@ void PlotwithErrors() {
   //DecodeDataFile("./data_file_charge_asym.in");
   //DecodeDataFile("./data_file_6393_MD6.in");
   //DecodeDataFile("./data_file_6394_MD7.in");
-  //DecodeDataFile("/home/rakitha/Documents/Moller_Data_analysis/Data_Moller_Sol_Scan");
-  //DecodeDataFile("/home/rakitha/Documents/Moller_Data_analysis/Data_Moller_Sol_Scan_bias");
-  //DecodeDataFile("/home/rakitha/Documents/Moller_Data_analysis/Data_Moller_Sol_Scan_bias_total");
-  //DecodeDataFile("/home/rakitha/Documents/Moller_Data_analysis/Data_Moller_Quad_Tune");
-  //DecodeDataFile("/home/rakitha/Qweak_Analysis/DataSet1/data_set1_IHWP_OUT");
-  //DecodeDataFile("/home/rakitha/Qweak_Analysis/DataSet1/data_set1_IHWP_IN");
-  //DecodeDataFile("/home/rakitha/Documents/Moller_Data_analysis/data_set_Moller_01-31-2011");
-  //DecodeDataFile("/home/rakitha/Documents/Moller_Data_analysis/data_set_Moller_02-04-2011");//moller measurement IHWP IN
-  //DecodeDataFile("/home/rakitha/Documents/Moller_Data_analysis/data_set_Moller_02-04-2011_OUT");
-  //DecodeDataFile("/home/rakitha/Qweak_Analysis/data_set_bcm1_IHWP_OUT_9594_9612");
-  DecodeDataFile("/home/rakitha/Qweak_Analysis/data_set_large_Aq");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Data_Beam_Trips_Stability_Cuts_R7143");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Data_Beam_Trips_Stability_Cuts_R7143_CoV_1p");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Data_Beam_Trips_Stability_Cuts_R7143_CoV_0.5p");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Beam_Trip_Analysis/Data_Beam_Trips_Stability_Cuts_R7143_SD_1");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Run_Summary/MD_ALL_IHWP_OUT_2ppm");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Run_Summary/MD_ALL_IHWP_IN_2ppm");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Run_Summary/Slug_Plot_IN_9278_9313_01-24-2011");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Run_Summary/Slug_Plot_OUT_9278_9313_01-24-2011");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Run_Summary/MD_ALL_BCM_IHWP_IN_Asym_Corr");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Fall10_Run_Summary/MD_All_BCM2_Asym_Corr_IHWP_IN_20ppm");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Fall10_Run_Summary/MD_ALL_IHWP_IN_2ppm_Corrected");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Fall10_Run_Summary/BCM1_Asym_IHWP_IN_20ppm");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Run_Summary/BCM1_Asym_IHWP_IN_2ppm");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/QwFeedback_Analysis/Data_Set_run9695_9703");
+  //Qtor scans
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/qtor_scans/LH2_Scans/LH2_TS_Trig_qtor_scan");
+  //Corrected scaler rates
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/qtor_scans/LH2_Scans/LH2_MD_Trig_qtor_scan_corrected");
+  //comparisons for MD
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/qtor_scans/LH2_Scans/LH2_TS_Trig_qtor_scan_MD_Compare");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/qtor_scans/LH2_Scans/LH2_MD_Trig_qtor_scan_MD_Compare");
+
+  //Large A_q runs analysis
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/BCM_Calib/data_set_large_Aq_10851-to-10854_IHWP_IN");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/BCM_Calib/data_set_large_Aq_10813-to-10816_IHWP_OUT");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/BCM_Calib/data_set_large_Aq_MDall_11293_IHWP_OUT");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/BCM_Calib/data_set_large_Aq_MDall_11292_IHWP_IN");
+
+  //PITA Scan
+  //04-07-2011
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/BCM_Calib/data_set_large_Aq_11153_IHWP_IN");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/BCM_Calib/data_set_large_Aq_11154_IHWP_OUT");
+  //04-12-2011
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/BCM_Calib/data_set_large_Aq_11293_IHWP_OUT");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/BCM_Calib/data_set_large_Aq_11292_IHWP_IN");
+
+  //Hall A IA scan
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/ha_bcm/data_set_ha_IA_scan_hc_bcm");
+											   
+  //corrected MD all bar asym 
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/BCM_Calib/data_set_Corrected_MD_ALL_10813-to-10816_IHWP_OUT");
+  //LH2 qtor scan data
+  //corrected scaler rates
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/qtor_scans/LH2_Scans/LH2_TS_Trig_qtor_scan_corrected");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/BCM_Calib/data_set_Corrected_MD_All_10851-to-10854_IHWP_IN");
+  //Lumi rates for LH2 QTOR scan
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/qtor_scans/LH2_Scans/LH2_USLumi_rates");
+
+  //Scaler rates norm to US Lumi
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/qtor_scans/LH2_Scans/LH2_TS_Trig_qtor_scan_Norm_Lumi");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/qtor_scans/LH2_Scans/LH2_TS_Trig_qtor_scan_MD_Compare_lumi_norm");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/qtor_scans/LH2_Scans/LH2_MD_Trig_qtor_scan_MD_Compare_lumi_norm");
+
+
+  //moller data analysis
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Moller_Data_Analysis/data_set_03-31-2011_IHWP-IN_A-q-adjusted");
+  DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Moller_Data_Analysis/data_set_04-15-2011_IHWP-OUT-Slit-control");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Moller_Data_Analysis/data_set_04-15-2011_IHWP-IN");
+
+
+
+  //scaler rates norm to US scaler rates
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/qtor_scans/LH2_Scans/LH2_TS_Trig_qtor_scan_Norm_US_lumi");
+  //US lumi calibration
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/qtor_scans/LH2_Scans/LH2_Lumi_Calibrated_Current");
+
   TCanvas *c1 = new TCanvas(Form("C_%s",MultiGraphName.Data()),Form("Canvas-%s",CanvasName.Data()),200,10,700,500);
   c1->cd();
-  c1->SetFillColor(42);
+  //c1->SetFillColor(42);
   c1->SetGrid();
 
   TGraphErrors * gr[ny];
@@ -372,30 +459,46 @@ void PlotwithErrors() {
   TMultiGraph *mg = new TMultiGraph(MultiGraphName,multigraphtitle);
 
   leg->SetHeader(LegHeader);
-  leg->SetFillColor(kWhite);
+  leg->SetFillColor(41);
   for (Int_t i=0;i<ny;i++){
-    gr[i] = new TGraphErrors(n,X,Y[i],0,eY[i]);
-    gr[i]->SetLineColor(2+i);
+    gr[i] = new TGraphErrors(n,X,Y[i],eX,eY[i]);
+    gr[i]->SetLineColor(1+i);
     gr[i]->SetLineWidth(1);
     gr[i]->SetMarkerColor(2+i);
-    gr[i]->SetMarkerStyle(21);
+    //gr[i]->SetMarkerStyle(21);//full square
+    //gr[i]->SetMarkerStyle(32);//open triangle down
+    gr[i]->SetMarkerStyle(i%3+2);
+    gr[i]->SetMarkerSize(1.4);
     gr[i]->SetTitle(GTitles[i]);
     leg->AddEntry(gr[i],gr[i]->GetTitle(), "p");
+
     mg->Add(gr[i],"P");
   }
 
 
-
+  
   mg->Draw("a");
   mg->GetXaxis()->SetTitle(xTitle);
   mg->GetYaxis()->SetTitle(yTitle);
-  //gStyle->SetOptFit(1);
 
   leg->Draw();
-
+  c1->SetFillColor(19);
   c1->Update();
-  c1->GetFrame()->SetFillColor(21);
+  c1->GetFrame()->SetFillColor(19);
   //c1->GetFrame()->SetBorderSize(12);
   c1->Modified();
 
 }
+
+
+void PlotMany() {
+  TCanvas *multi_canvas = new TCanvas(Form("C_%s",multicanvas_name.Data()),Form("Canvas-%s",multicanvas_title.Data()),200,10,1000,1000);
+  multi_canvas->Divide(CANVAS_SPLIT_Col,CANVAS_SPLIT_Raw);
+  multi_canvas->SetGrid();
+  multi_canvas->Modified();
+  for(Int_t i=0;i<CANVAS_SPLIT_Col*CANVAS_SPLIT_Raw;i++){
+    multi_canvas->cd(i);
+    
+  }
+}
+
