@@ -30,11 +30,14 @@ v 0.0.0 Thu 17:57:56 2011 :
 		       .L PlotTools.C
 		       Plot() or
 		       PlotwithErrors()
+
+v 1.0.0                Replaced X,Y arrays with vectors of type Double_t
 		       
 
  */
 
 #include <vector>
+#include <algorithm>
 #include "TRandom.h"
 
 #include <math.h>
@@ -63,33 +66,41 @@ v 0.0.0 Thu 17:57:56 2011 :
 #define CANVAS_SPLIT_Raw 2
 
 
+TString multicanvas_name="Multi_C";
+TString multicanvas_title="Multiple Plots";
+
 Int_t Read_Data_file(TString data_file);
 string GetNextToken(const string& line);
 string GetNextToken(const string& line, const char& delim);
 void PlotwithErrors();
-const Int_t n = 4;//
-const Int_t ny =1;
-Double_t X[n], Y[ny][n];
-//vector<Double_t> X;
-//vector<<vector<Double_t>Double_t> Y;
-//X.resize(n);
+void PlotMany(TString list_file_name);
+void PlotData(TString data_file);
+Int_t n;// = 53;//
+Int_t ny;// =1;
+//Double_t X[n], Y[ny][n];
+//Double_t Y[ny][n];
+vector<Double_t> X;
+vector< vector<Double_t> > Y;
+
 //Y.resize(ny);
-Double_t eX[n], eY[ny][n];
-Bool_t hasXErrors = kFALSE;//kTRUE;
-Bool_t hasYErrors = kTRUE;//kFALSE;//kTRUE;
+vector<Double_t> eX;
+vector< vector<Double_t> > eY;
+
+//Double_t eX[n], eY[ny][n];
+Bool_t hasXErrors;// = kFALSE;//kTRUE;
+Bool_t hasYErrors;// = kTRUE;//kFALSE;//kTRUE;
 
 //These will be read from the data file
 
 TString CanvasName;
 TString MultiGraphName;
 TString LegHeader;
-TString GTitles[ny];
+vector<TString> GTitles;
 TString multigraphtitle;
 TString xTitle;
 TString yTitle;
 
-TString multicanvas_name="Multi_C";
-TString multicanvas_title="Multiple Plots";
+
 
 
 //Use this routine to check the data file
@@ -271,7 +282,6 @@ vector<Double_t> Tokenize(const string& line, const char& delim){
 }
 
 void DecodeDataFile(TString data_file){
-
   Int_t x,y;
   vector<Double_t> raw_data;//data for one raw
   TString line;
@@ -308,7 +318,7 @@ void DecodeDataFile(TString data_file){
       LegHeader=line;
 	for (Int_t i=0;i<ny;i++){
 	  line.ReadLine(inputdata);
-	  GTitles[i]=line;
+	  GTitles.push_back(line);
 	}
       line.ReadLine(inputdata);
       multigraphtitle=line;
@@ -317,6 +327,40 @@ void DecodeDataFile(TString data_file){
       line.ReadLine(inputdata);
       yTitle=line;
       break;
+    }else if (line=="INIT"){
+      std::cout<<"here"<<std::endl;
+
+      line.ReadLine(inputdata);
+      n=line.Atoi();//no. of data rows
+      line.ReadLine(inputdata);
+      ny=line.Atoi();//no. of y columns
+      line.ReadLine(inputdata);
+      X.empty();
+      X.resize(n);
+      eX.empty();
+      eX.resize(n);
+      for(Int_t i=0;i<ny;i++){
+	std::cout<<"here"<<std::endl;
+	Y.empty();
+	Y.push_back(X); 
+	eY.empty();
+	eY.push_back(X); 
+	std::cout<<"here"<<std::endl;
+      }
+      if(line.Contains("1")){
+	std::cout<<"here"<<std::endl;
+	hasYErrors=kTRUE;
+      }
+      else
+	hasYErrors=kFALSE;
+      line.ReadLine(inputdata);
+      if(line.Contains("1")){  
+	hasXErrors=kTRUE;
+      }
+      else
+	hasXErrors=kFALSE;
+      //set X,Y sizes properly
+ 
     }
     else{
       //GetNextToken(line.Data(),'\t');
@@ -334,13 +378,13 @@ void DecodeDataFile(TString data_file){
 void FillDataArrays(Int_t x,vector<Double_t> &raw_data){
   Int_t count_col=1;
   Int_t count=0;
+
   X[x]=raw_data.at(0);//x value
   if (hasXErrors){
     eX[x]=raw_data.at(1);//x value
     count_col++;
   }else
-    eX[x]=0;
-
+    //eX[x]=0;
   while(count<ny){
      Y[count][x]=raw_data.at(count_col);//y1 value
      if (hasYErrors){
@@ -469,7 +513,7 @@ void PlotwithErrors() {
 
   //moller data analysis
   //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Moller_Data_Analysis/data_set_03-31-2011_IHWP-IN_A-q-adjusted");
-  DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Moller_Data_Analysis/data_set_04-15-2011_IHWP-OUT-Slit-control");
+  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Moller_Data_Analysis/data_set_04-15-2011_IHWP-OUT-Slit-control");
   //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Moller_Data_Analysis/data_set_04-15-2011_IHWP-IN");
 
 
@@ -478,31 +522,54 @@ void PlotwithErrors() {
   //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/qtor_scans/LH2_Scans/LH2_TS_Trig_qtor_scan_Norm_US_lumi");
   //US lumi calibration
   //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/qtor_scans/LH2_Scans/LH2_Lumi_Calibrated_Current");
+  DecodeDataFile("./data_file_charge_asym.in");
+  
 
   TCanvas *c1 = new TCanvas(Form("C_%s",MultiGraphName.Data()),Form("Canvas-%s",CanvasName.Data()),200,10,700,500);
   c1->cd();
   //c1->SetFillColor(42);
   c1->SetGrid();
 
-  TGraphErrors * gr[ny];
+  //to convert the double vectors to arrays.
+  Double_t *dd_x=new Double_t[X.size()];
+  Double_t *dd_y=new Double_t[X.size()];
+  copy(X.begin(),X.end(),dd_x);
+
+  //copy errors
+  Double_t *dd_ex=NULL;
+  Double_t *dd_ey=NULL;
+
+  if(hasXErrors){
+    dd_ex=new Double_t[X.size()];
+    copy(eX.begin(),eX.end(),dd_ex);
+  }
+
+  TGraphErrors* gr=NULL;
+
   TLegend *leg = new TLegend(0.1,0.7,0.28,0.8);
   TMultiGraph *mg = new TMultiGraph(MultiGraphName,multigraphtitle);
 
   leg->SetHeader(LegHeader);
   leg->SetFillColor(41);
   for (Int_t i=0;i<ny;i++){
-    gr[i] = new TGraphErrors(n,X,Y[i],eX,eY[i]);
-    gr[i]->SetLineColor(1+i);
-    gr[i]->SetLineWidth(1);
-    gr[i]->SetMarkerColor(2+i);
+    copy(Y[i].begin(),Y[i].end(),dd_y);
+    if(hasYErrors){
+      dd_ey=new Double_t[X.size()];
+      copy(eY[i].begin(),eY[i].end(),dd_ey);
+    }
+    gr= new TGraphErrors(n,dd_x,dd_y,dd_ex,dd_ey);
+    gr->SetLineColor(1+i);
+    gr->SetLineWidth(1);
+    gr->SetMarkerColor(2+i);
     //gr[i]->SetMarkerStyle(21);//full square
     //gr[i]->SetMarkerStyle(32);//open triangle down
-    gr[i]->SetMarkerStyle(i%3+2);
-    gr[i]->SetMarkerSize(1.4);
-    gr[i]->SetTitle(GTitles[i]);
-    leg->AddEntry(gr[i],gr[i]->GetTitle(), "p");
+    gr->SetMarkerStyle(i%3+2);
+    gr->SetMarkerSize(1.4);
+    gr->SetTitle(GTitles[i]);
+    leg->AddEntry(gr,gr->GetTitle(), "p");
 
-    mg->Add(gr[i],"P");
+    mg->Add(gr,"P");
+    gr=NULL;
   }
 
 
@@ -512,6 +579,7 @@ void PlotwithErrors() {
   mg->GetYaxis()->SetTitle(yTitle);
 
   leg->Draw();
+  
   c1->SetFillColor(19);
   c1->Update();
   c1->GetFrame()->SetFillColor(19);
@@ -521,14 +589,111 @@ void PlotwithErrors() {
 }
 
 
-void PlotMany() {
+void PlotMany(TString list_file_name) {
+  vector<TString> file_list;
+  TString file_name;
+  ifstream list_file(list_file_name);
+  if(!list_file)
+    {
+      std::cerr << "ERROR: file with values :"<<list_file<<" not found trying to read the default file\n";
+      return(1);
+    }
+  else
+    std::cout<<" file with values : "<<list_file_name<<" is open \n";
+
+  while(list_file){
+    file_name.ReadLine(list_file);
+
+    if(file_name(0,1)=="#"){  //this is a line of commentary
+      std::cout<<"Comment :"<<file_name<<std::endl;
+      continue;
+    }else if(file_name=="END"){//end of file list
+      break;
+    }else{
+      file_list.push_back(file_name);
+    }
+
+  }
+  
+
   TCanvas *multi_canvas = new TCanvas(Form("C_%s",multicanvas_name.Data()),Form("Canvas-%s",multicanvas_title.Data()),200,10,1000,1000);
+
+  vector<TMultiGraph *> mg_list;
+
+
   multi_canvas->Divide(CANVAS_SPLIT_Col,CANVAS_SPLIT_Raw);
   multi_canvas->SetGrid();
   multi_canvas->Modified();
   for(Int_t i=0;i<CANVAS_SPLIT_Col*CANVAS_SPLIT_Raw;i++){
-    multi_canvas->cd(i);
-    
+    printf("file name = %s \n",file_list[i].Data());
+    multi_canvas->cd(i+1);    
+    PlotData(file_list[i]);
   }
 }
+
+
+void PlotData(TString data_file){
+  DecodeDataFile(data_file);
+ 
+  //TCanvas *c1 = new TCanvas(Form("C_%s",MultiGraphName.Data()),Form("Canvas-%s",CanvasName.Data()),200,10,700,500);
+  //c1->cd();
+  //c1->SetFillColor(42);
+  //c1->SetGrid();
+
+  //to convert the double vectors to arrays.
+  Double_t *dd_x=new Double_t[X.size()];
+  Double_t *dd_y=new Double_t[X.size()];
+  copy(X.begin(),X.end(),dd_x);
+
+  //copy errors
+  Double_t *dd_ex=NULL;
+  Double_t *dd_ey=NULL;
+
+  if(hasXErrors){
+    dd_ex=new Double_t[X.size()];
+    copy(eX.begin(),eX.end(),dd_ex);
+  }
+
+  TGraphErrors* gr=NULL;
+
+  TLegend *leg = new TLegend(0.1,0.7,0.28,0.8);
+  TMultiGraph *mg = new TMultiGraph(MultiGraphName,multigraphtitle);
+
+  leg->SetHeader(LegHeader);
+  leg->SetFillColor(41);
+  for (Int_t i=0;i<ny;i++){
+    copy(Y[i].begin(),Y[i].end(),dd_y);
+    if(hasYErrors){
+      dd_ey=new Double_t[X.size()];
+      copy(eY[i].begin(),eY[i].end(),dd_ey);
+    }
+    gr= new TGraphErrors(n,dd_x,dd_y,dd_ex,dd_ey);
+    gr->SetLineColor(1+i);
+    gr->SetLineWidth(1);
+    gr->SetMarkerColor(2+i);
+    //gr[i]->SetMarkerStyle(21);//full square
+    //gr[i]->SetMarkerStyle(32);//open triangle down
+    gr->SetMarkerStyle(i%3+2);
+    gr->SetMarkerSize(1.4);
+    gr->SetTitle(GTitles[i]);
+    leg->AddEntry(gr,gr->GetTitle(), "p");
+
+    mg->Add(gr,"P");
+    gr=NULL;
+  }
+
+
+  
+  mg->Draw("a");
+  mg->GetXaxis()->SetTitle(xTitle);
+  mg->GetYaxis()->SetTitle(yTitle);
+
+  leg->Draw();
+  
+  //c1->SetFillColor(19);
+  //c1->Update();
+  //c1->GetFrame()->SetFillColor(19);
+  //c1->GetFrame()->SetBorderSize(12);
+  //c1->Modified();  
+};
 
