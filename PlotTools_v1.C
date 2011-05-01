@@ -31,10 +31,48 @@ v 0.0.0 Thu 17:57:56 2011 :
 		       Plot() or
 		       PlotwithErrors()
 
-See PlotTools_v1.C for most recent updated version
- */
+v 0.1.0                Replaced X,Y arrays with vectors of type Double_t
+
+v 1.0.0                All the parameters are passed through text files - Tue Apr 26 21:14:57 EDT 2011
+                       Each data file has three sections.
+		       INIT
+		       #no. of raws
+		       #no. of y columns
+		       #Y has errors 1 or 0
+		       #X has errors 1 or 0
+		       Data, X (+/- error) columns Y1 (+/- error) columns ....Yn (+/- error)
+		       END
+                          canvas name
+                          canvas title
+                          Legend title
+                          names of Y axis parameter (line for each Y value)
+                          Multi Graph Title
+                          X axis name + unit
+                          Y axis name + unit
+
+		      Then many(1 to N) of above data files can be passed together to be drawn in a divided canvas
+		      This main file contains list of data files and section 'END'
+		      canvas name
+		      canvas title
+		      no.of row in the canvas
+		      no. of columns in the canvas
+		      
+		      Make sure columns times the rows must greater than or equal to no. of data files in to be
+		      drawn
+
+		      To plot
+		      .L PlotTools.C
+		      PlotMany("/path/data_file_list_file_name")
+		       
+
+
+
+
+
+*/
 
 #include <vector>
+#include <algorithm>
 #include "TRandom.h"
 
 #include <math.h>
@@ -56,40 +94,55 @@ See PlotTools_v1.C for most recent updated version
 #include <cstdio>
 #include <TMath.h>
 
+
 #include <cstdlib>
+#include <TCanvas.h>
+#include <TGraph.h>
+#include <TMultiGraph.h>
+#include <TLegend.h>
+#include <TGraphErrors.h>
+#include <TFrame.h>
 
-
-#define CANVAS_SPLIT_Col 2
-#define CANVAS_SPLIT_Raw 2
 
 
 Int_t Read_Data_file(TString data_file);
 string GetNextToken(const string& line);
 string GetNextToken(const string& line, const char& delim);
+void TrimWhiteSpaces(string &line);
+vector<Double_t> Tokenize(const string& line, const char& delim);
+void DecodeDataFile(TString data_file);
+void FillDataArrays(Int_t x,vector<Double_t> &raw_data);
+void Plot();
 void PlotwithErrors();
-const Int_t n = 5;//
-const Int_t ny =1;
-Double_t X[n], Y[ny][n];
-//vector<Double_t> X;
-//vector<<vector<Double_t>Double_t> Y;
-//X.resize(n);
-//Y.resize(ny);
-Double_t eX[n], eY[ny][n];
-Bool_t hasXErrors = kFALSE;//kTRUE;
-Bool_t hasYErrors = kTRUE;//kFALSE;//kTRUE;
+void PlotMany(TString list_file_name);
+void PlotData(TString data_file);
+Int_t n;//no. of rows of data 
+Int_t ny;//no. of y parameters
+
+vector<Double_t> X;
+vector< vector<Double_t> > Y;
+
+vector<Double_t> eX;
+vector< vector<Double_t> > eY;
+Double_t *dd_x;
+Double_t *dd_y;
+Double_t *dd_ex;
+Double_t *dd_ey;
+
+Bool_t hasXErrors;// set at individual data files
+Bool_t hasYErrors;// set at individual data files
 
 //These will be read from the data file
 
 TString CanvasName;
 TString MultiGraphName;
 TString LegHeader;
-TString GTitles[ny];
+vector<TString> GTitles;
 TString multigraphtitle;
 TString xTitle;
 TString yTitle;
 
-TString multicanvas_name="Multi_C";
-TString multicanvas_title="Multiple Plots";
+vector<TLegend> vec_leg;
 
 
 //Use this routine to check the data file
@@ -117,19 +170,18 @@ Int_t Read_Data_file(TString data_file)
       line.ReadLine(inputdata);
       
     }
-    else{
-      
-    }
+
   }
 
   inputdata.close();
+
+  return 0;
 }
 
 string GetNextToken(const string& line)
 {
   string tmpstring = "";
   size_t pos1 = 0;
-  size_t pos2 = line.length();//line.find_first_of(separatorchars.c_str(), pos1);
   size_t fCurrentPos=0;
   size_t count=0;
   printf("line len %i \n",line.length());
@@ -163,7 +215,6 @@ string GetNextToken(const string& line, const char& delim)
   TString value;
   string tmpstring = "";
   size_t pos1 = 0;
-  size_t pos2 = line.length();//line.find_first_of(separatorchars.c_str(), pos1);
   size_t fCurrentPos=0;
   size_t count=0;
   printf("line len %i \n",line.length());
@@ -206,7 +257,6 @@ string GetNextToken(const string& line, const char& delim)
 
 void TrimWhiteSpaces(string &line){
   string tmpstring;
-  size_t pos1 = 0;
   size_t pos2 = 0;
   pos2 = line.find_first_not_of(' ');
   if (line.length()==0)
@@ -271,7 +321,6 @@ vector<Double_t> Tokenize(const string& line, const char& delim){
 }
 
 void DecodeDataFile(TString data_file){
-
   Int_t x,y;
   vector<Double_t> raw_data;//data for one raw
   TString line;
@@ -280,13 +329,14 @@ void DecodeDataFile(TString data_file){
   if(!inputdata)
     {
       std::cerr << "ERROR: file with values :"<<data_file<<" not found trying to read the default file\n";
-      return(1);
+      return;
     }
   else
     std::cout<<" file with values : "<<data_file<<" is open \n";
 
   x=0;//no of entries/raws
   y=0;//no.of data columns in a raw
+  GTitles.clear();
   while(inputdata){
     /*
     if (x==n){
@@ -308,7 +358,7 @@ void DecodeDataFile(TString data_file){
       LegHeader=line;
 	for (Int_t i=0;i<ny;i++){
 	  line.ReadLine(inputdata);
-	  GTitles[i]=line;
+	  GTitles.push_back(line);
 	}
       line.ReadLine(inputdata);
       multigraphtitle=line;
@@ -317,6 +367,36 @@ void DecodeDataFile(TString data_file){
       line.ReadLine(inputdata);
       yTitle=line;
       break;
+    }else if (line=="INIT"){
+      line.ReadLine(inputdata);
+      n=line.Atoi();//no. of data rows
+      line.ReadLine(inputdata);
+      ny=line.Atoi();//no. of y columns
+      line.ReadLine(inputdata);
+      //set X,Y sizes properly
+      X.clear();
+      X.resize(n);
+      eX.clear();
+      eX.resize(n);
+      Y.clear();
+      eY.clear();
+      for(Int_t i=0;i<ny;i++){	
+	Y.push_back(X); 
+	eY.push_back(X); 
+      }
+      if(line.Contains("1")){
+	hasYErrors=kTRUE;
+      }
+      else
+	hasYErrors=kFALSE;
+      line.ReadLine(inputdata);
+      if(line.Contains("1")){  
+	hasXErrors=kTRUE;
+      }
+      else
+	hasXErrors=kFALSE;
+      
+ 
     }
     else{
       //GetNextToken(line.Data(),'\t');
@@ -334,17 +414,20 @@ void DecodeDataFile(TString data_file){
 void FillDataArrays(Int_t x,vector<Double_t> &raw_data){
   Int_t count_col=1;
   Int_t count=0;
+
   X[x]=raw_data.at(0);//x value
   if (hasXErrors){
     eX[x]=raw_data.at(1);//x value
     count_col++;
-  }else
-    eX[x]=0;
-
+  }//else
+    //eX[x]=0;
   while(count<ny){
      Y[count][x]=raw_data.at(count_col);//y1 value
+     printf("before Y[0][ii] %f \n",Y[count][x]);
+    
      if (hasYErrors){
        eY[count][x]=raw_data.at(count_col+1);//y1 error value
+       printf("before eY[0][ii] %f \n",eY[count][x]);
        count_col+=2;
      }else
        count_col++;
@@ -354,19 +437,18 @@ void FillDataArrays(Int_t x,vector<Double_t> &raw_data){
 }
 
 void Plot() {
-  //DecodeDataFile("./data_file_MD_2_TS_6393.in");
-  //DecodeDataFile("./data_file_MD_2_TS_6394.in");
-  //DecodeDataFile("./data_file_6393.in");
-  //DecodeDataFile("./data_file_6393_MD6.in");
-  //DecodeDataFile("./data_file_6394.in");
-  //DecodeDataFile("./data_file_6394_MD7.in");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Beam_Trip_Analysis/Data_Beam_Trips_Stability_Cuts_R7143_SD_1");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Run_Summary/MD_ALL_Asym_Width_IHWP_IN");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Run_Summary/MD_ALL_Asym_Width_IHWP_OUT");
-
 
   //MD bar corrections terms
   DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/qtor_scans/LH2_Scans/LH2_MD_Trig_qtor_scan_MD5_Corrections");
+
+
+ //to convert the double vectors to arrays.
+  Double_t *dd_x=new Double_t[X.size()];
+  Double_t *dd_y=new Double_t[X.size()];
+  copy(X.begin(),X.end(),dd_x);
+
+
+
 
   TCanvas *c1 = new TCanvas(Form("C_%s",MultiGraphName.Data()),Form("Canvas-%s",CanvasName.Data()),200,10,700,500);
   c1->cd();
@@ -380,7 +462,8 @@ void Plot() {
   leg->SetHeader(LegHeader);
   leg->SetFillColor(41);
   for (Int_t i=0;i<ny;i++){
-    gr[i] = new TGraph(n,X,Y[i]);
+    copy(Y[i].begin(),Y[i].end(),dd_y);
+    gr[i] = new TGraph(n,dd_x,dd_y);
     //gr[i]->SetLineColor(1+i);
     gr[i]->SetLineWidth(4);
     gr[i]->SetMarkerColor(1+i);
@@ -410,102 +493,54 @@ void Plot() {
 }
 
 void PlotwithErrors() {
-  //DecodeDataFile("./data_file_charge_asym.in");
-  //DecodeDataFile("./data_file_6393_MD6.in");
-  //DecodeDataFile("./data_file_6394_MD7.in");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Data_Beam_Trips_Stability_Cuts_R7143");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Data_Beam_Trips_Stability_Cuts_R7143_CoV_1p");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Data_Beam_Trips_Stability_Cuts_R7143_CoV_0.5p");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Beam_Trip_Analysis/Data_Beam_Trips_Stability_Cuts_R7143_SD_1");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Run_Summary/MD_ALL_IHWP_OUT_2ppm");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Run_Summary/MD_ALL_IHWP_IN_2ppm");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Run_Summary/Slug_Plot_IN_9278_9313_01-24-2011");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Run_Summary/Slug_Plot_OUT_9278_9313_01-24-2011");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Run_Summary/MD_ALL_BCM_IHWP_IN_Asym_Corr");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Fall10_Run_Summary/MD_All_BCM2_Asym_Corr_IHWP_IN_20ppm");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Fall10_Run_Summary/MD_ALL_IHWP_IN_2ppm_Corrected");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Fall10_Run_Summary/BCM1_Asym_IHWP_IN_20ppm");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Run_Summary/BCM1_Asym_IHWP_IN_2ppm");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/QwFeedback_Analysis/Data_Set_run9695_9703");
-  //Qtor scans
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/qtor_scans/LH2_Scans/LH2_TS_Trig_qtor_scan");
-  //Corrected scaler rates
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/qtor_scans/LH2_Scans/LH2_MD_Trig_qtor_scan_corrected");
-  //comparisons for MD
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/qtor_scans/LH2_Scans/LH2_TS_Trig_qtor_scan_MD_Compare");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/qtor_scans/LH2_Scans/LH2_MD_Trig_qtor_scan_MD_Compare");
-
-  //Large A_q runs analysis
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/BCM_Calib/data_set_large_Aq_10851-to-10854_IHWP_IN");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/BCM_Calib/data_set_large_Aq_10813-to-10816_IHWP_OUT");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/BCM_Calib/data_set_large_Aq_MDall_11293_IHWP_OUT");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/BCM_Calib/data_set_large_Aq_MDall_11292_IHWP_IN");
-
-  //PITA Scan
-  //04-07-2011
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/BCM_Calib/data_set_large_Aq_11153_IHWP_IN");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/BCM_Calib/data_set_large_Aq_11154_IHWP_OUT");
-  //04-12-2011
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/BCM_Calib/data_set_large_Aq_11293_IHWP_OUT");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/BCM_Calib/data_set_large_Aq_11292_IHWP_IN");
-  //04-23-2011
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/BCM_Calib/data_set_large_Aq_11568_IHWP_OUT");
-  DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/BCM_Calib/data_set_large_Aq_11561_IHWP_IN");
-
-  //Hall A IA scan
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/ha_bcm/data_set_ha_IA_scan_hc_bcm");
-											   
-  //corrected MD all bar asym 
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/BCM_Calib/data_set_Corrected_MD_ALL_10813-to-10816_IHWP_OUT");
-  //LH2 qtor scan data
-  //corrected scaler rates
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/qtor_scans/LH2_Scans/LH2_TS_Trig_qtor_scan_corrected");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/BCM_Calib/data_set_Corrected_MD_All_10851-to-10854_IHWP_IN");
-  //Lumi rates for LH2 QTOR scan
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/qtor_scans/LH2_Scans/LH2_USLumi_rates");
-
-  //Scaler rates norm to US Lumi
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/qtor_scans/LH2_Scans/LH2_TS_Trig_qtor_scan_Norm_Lumi");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/qtor_scans/LH2_Scans/LH2_TS_Trig_qtor_scan_MD_Compare_lumi_norm");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/qtor_scans/LH2_Scans/LH2_MD_Trig_qtor_scan_MD_Compare_lumi_norm");
-
-
-  //moller data analysis
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Moller_Data_Analysis/data_set_03-31-2011_IHWP-IN_A-q-adjusted");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Moller_Data_Analysis/data_set_04-15-2011_IHWP-OUT-Slit-control");
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/Moller_Data_Analysis/data_set_04-22-2011_IHWP-OUT");
-
-
-
-  //scaler rates norm to US scaler rates
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/qtor_scans/LH2_Scans/LH2_TS_Trig_qtor_scan_Norm_US_lumi");
-  //US lumi calibration
-  //DecodeDataFile("/home/rakithab/Qweak_Data_Analysis/qtor_scans/LH2_Scans/LH2_Lumi_Calibrated_Current");
+  DecodeDataFile("./data_file_charge_asym.in");
+  
 
   TCanvas *c1 = new TCanvas(Form("C_%s",MultiGraphName.Data()),Form("Canvas-%s",CanvasName.Data()),200,10,700,500);
   c1->cd();
   //c1->SetFillColor(42);
   c1->SetGrid();
 
-  TGraphErrors * gr[ny];
+  //to convert the double vectors to arrays.
+  Double_t *dd_x=new Double_t[X.size()];
+  Double_t *dd_y=new Double_t[X.size()];
+  copy(X.begin(),X.end(),dd_x);
+
+  //copy errors
+  Double_t *dd_ex=NULL;
+  Double_t *dd_ey=NULL;
+
+  if(hasXErrors){
+    dd_ex=new Double_t[X.size()];
+    copy(eX.begin(),eX.end(),dd_ex);
+  }
+
+  TGraphErrors* gr=NULL;
+
   TLegend *leg = new TLegend(0.1,0.7,0.28,0.8);
   TMultiGraph *mg = new TMultiGraph(MultiGraphName,multigraphtitle);
 
   leg->SetHeader(LegHeader);
   leg->SetFillColor(41);
   for (Int_t i=0;i<ny;i++){
-    gr[i] = new TGraphErrors(n,X,Y[i],eX,eY[i]);
-    gr[i]->SetLineColor(1+i);
-    gr[i]->SetLineWidth(1);
-    gr[i]->SetMarkerColor(2+i);
+    copy(Y[i].begin(),Y[i].end(),dd_y);
+    if(hasYErrors){
+      dd_ey=new Double_t[X.size()];
+      copy(eY[i].begin(),eY[i].end(),dd_ey);
+    }
+    gr= new TGraphErrors(n,dd_x,dd_y,dd_ex,dd_ey);
+    gr->SetLineColor(1+i);
+    gr->SetLineWidth(1);
+    gr->SetMarkerColor(2+i);
     //gr[i]->SetMarkerStyle(21);//full square
     //gr[i]->SetMarkerStyle(32);//open triangle down
-    gr[i]->SetMarkerStyle(i%3+2);
-    gr[i]->SetMarkerSize(1.4);
-    gr[i]->SetTitle(GTitles[i]);
-    leg->AddEntry(gr[i],gr[i]->GetTitle(), "p");
+    gr->SetMarkerStyle(i%3+2);
+    gr->SetMarkerSize(1.4);
+    gr->SetTitle(GTitles[i]);
+    leg->AddEntry(gr,gr->GetTitle(), "p");
 
-    mg->Add(gr[i],"P");
+    mg->Add(gr,"P");
+    gr=NULL;
   }
 
 
@@ -515,6 +550,7 @@ void PlotwithErrors() {
   mg->GetYaxis()->SetTitle(yTitle);
 
   leg->Draw();
+  
   c1->SetFillColor(19);
   c1->Update();
   c1->GetFrame()->SetFillColor(19);
@@ -524,14 +560,160 @@ void PlotwithErrors() {
 }
 
 
-void PlotMany() {
-  TCanvas *multi_canvas = new TCanvas(Form("C_%s",multicanvas_name.Data()),Form("Canvas-%s",multicanvas_title.Data()),200,10,1000,1000);
-  multi_canvas->Divide(CANVAS_SPLIT_Col,CANVAS_SPLIT_Raw);
+void PlotMany(TString list_file_name) {
+  TString  multicanvas_name,multicanvas_title;
+  UInt_t c_rows;
+  UInt_t c_columns;
+  vector<TString> file_list;
+  TString file_name;
+  ifstream list_file(list_file_name);
+  if(!list_file)
+    {
+      std::cerr << "ERROR: file with values :"<<list_file<<" not found trying to read the default file\n";
+      return;
+    }
+  else
+    std::cout<<" file with values : "<<list_file_name<<" is open \n";
+
+  while(list_file){
+    file_name.ReadLine(list_file);
+
+    if(file_name(0,1)=="#"){  //this is a line of commentary
+      std::cout<<"Comment :"<<file_name<<std::endl;
+      continue;
+    }else if(file_name=="END"){//end of file list
+      multicanvas_name.ReadLine(list_file);
+      multicanvas_title.ReadLine(list_file);
+      file_name.ReadLine(list_file);
+      c_rows=file_name.Atoi();
+      file_name.ReadLine(list_file);
+      c_columns=file_name.Atoi();	
+      break;
+    }else{
+      file_list.push_back(file_name);
+    }
+
+  }
+  
+
+  TCanvas *multi_canvas = new TCanvas(Form("C_%s",multicanvas_name.Data()),Form("Canvas-%s",multicanvas_title.Data()),1);
+  /*
+    Create a new canvas with a predefined size form.
+  If form < 0  the menubar is not shown.
+
+  form = 1    700x500 at 10,10 (set by TStyle::SetCanvasDefH,W,X,Y)
+  form = 2    500x500 at 20,20
+  form = 3    500x500 at 30,30
+  form = 4    500x500 at 40,40
+  form = 5    500x500 at 50,50
+   */
+
+  vector<TMultiGraph *> mg_list;
+
+
+  multi_canvas->Divide(c_columns,c_rows);
   multi_canvas->SetGrid();
   multi_canvas->Modified();
-  for(Int_t i=0;i<CANVAS_SPLIT_Col*CANVAS_SPLIT_Raw;i++){
-    multi_canvas->cd(i);
-    
+  for(UInt_t i=0;i<c_columns*c_rows;i++){
+    if (i<file_list.size()){
+      printf("file name = %s \n",file_list[i].Data());
+      multi_canvas->cd(i+1);    
+      PlotData(file_list[i]);
+    } else
+      printf("No more plots available \n");
   }
 }
+
+
+void PlotData(TString data_file){
+  DecodeDataFile(data_file);
+ 
+  //TCanvas *c1 = new TCanvas(Form("C_%s",MultiGraphName.Data()),Form("Canvas-%s",CanvasName.Data()),200,10,700,500);
+  //c1->cd();
+  //c1->SetFillColor(42);
+  //c1->SetGrid();
+
+  //to convert the double vectors to arrays.
+  dd_x=new Double_t[X.size()];
+  dd_y=new Double_t[X.size()];
+  for (Int_t ii=0;ii<X.size();ii++){
+    dd_x[ii]=X[ii];
+    printf("%f \n",dd_x[ii]);
+    printf("Y[0][ii] %f \n",Y[0][ii]);
+    printf("eY[0][ii] %f \n",eY[0][ii]);
+  }
+
+  //copy(X.begin(),X.end(),dd_x);
+
+  //copy errors
+  dd_ex=new Double_t[X.size()];
+  dd_ey=new Double_t[X.size()];
+
+  for (Int_t ii=0;ii<X.size();ii++){
+    if(hasXErrors)
+      dd_ex[ii]=eX[ii];  
+    else
+      dd_ex[ii]=0;
+
+    printf("dd_ex[ii] %f \n",dd_ex[ii]);
+    
+  }
+
+  TGraphErrors* gr=NULL;
+  TGraphErrors gr_copy;
+  TLegend *leg = new TLegend(0.1,0.7,0.28,0.8);
+  TMultiGraph *mg = new TMultiGraph(MultiGraphName,multigraphtitle);
+
+  leg->SetHeader(LegHeader);
+  leg->SetFillColor(41);
+  
+  for (Int_t i=0;i<Y.size();i++){
+    printf("here \n");
+    for (Int_t ii=0;ii<Y[i].size();ii++){
+      dd_y[ii]=Y[i][ii];
+      printf("%f \n",dd_y[ii]);
+    }
+    for (Int_t ii=0;ii<eY[i].size();ii++){
+      if(hasYErrors)
+	dd_ey[ii]=eY[i][ii];
+      else
+	dd_ey[ii]=0;
+      printf("%f \n",dd_ey[ii]);
+    }
+      
+    gr= new TGraphErrors(n,dd_x,dd_y,dd_ex,dd_ey);
+    gr->SetLineColor(1+i);
+    gr->SetLineWidth(1);
+    gr->SetMarkerColor(2+i);
+    //gr[i]->SetMarkerStyle(21);//full square
+    //gr[i]->SetMarkerStyle(32);//open triangle down
+    gr->SetMarkerStyle(i%3+2);
+    gr->SetMarkerSize(1.4);
+    gr->SetTitle(GTitles[i]);
+    std::cout<<gr->GetTitle()<<" "<<GTitles[i]<<std::endl;
+    leg->AddEntry(gr,"", "p");
+
+    mg->Add(gr,"P");
+    gr=NULL;
+  }
+  mg->Draw("a");
+  mg->GetXaxis()->SetTitle(xTitle);
+  mg->GetYaxis()->SetTitle(yTitle);
+
+  leg->Draw();
+
+  //leg=NULL;
+  
+  //c1->SetFillColor(19);
+  //c1->Update();
+  //c1->GetFrame()->SetFillColor(19);
+  //c1->GetFrame()->SetBorderSize(12);
+  //c1->Modified(); 
+  
+  delete dd_ex;
+  delete dd_ey;
+  delete dd_x;
+  delete dd_y;
+
+};
 
