@@ -13,3 +13,18 @@ I removed the public key in the ISOTDAQ and add it under account settings that w
   559  git push origin master
   560  touch README
   561  history > README 
+
+Fri May 06 09:13:36 EDT 2011
+TO make the new copy of the git repository on a new computer,
+
+1. Create a public key first for the email address
+ssh-keygen -t rsa -C "rakithab@gmail.com"
+
+2. Copy the content except the last part containing the email address from the file,
+   .ssh/id_rsa.pub 
+
+3. Edit or add to the public keys in the GIT-HUB account settings.
+
+4. Then clone the repository,
+git checkout git@github.com:rakithab/scratch-scripts
+
